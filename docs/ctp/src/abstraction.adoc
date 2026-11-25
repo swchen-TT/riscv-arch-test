@@ -91,7 +91,7 @@ The RVMODEL DUT-Specific Macros rely on the capabilities of the SoC and/or testb
 
 ==== Macros
 
-The RVMODEL DUT-Specific Macros are given in <<t-rvmodel>>. The "Can Be Empty?" field indicates circumstances under which the macro can be empty. The Mode column indicates the privilege mode from which the macro can be called.  All macros can clobber `a0`, `a1`, and `a2` if needed to make T-SBI calls.
+The RVMODEL DUT-Specific Macros are given in <<t-rvmodel>>. The "Can Be Empty?" field indicates circumstances under which the macro can be empty. The Mode column indicates the privilege mode from which the macro can be called.  Unless its description says otherwise, a macro may clobber `a0`, `a1`, `a2`, and its register arguments, and must preserve all other registers, including `ra`. See <<tsbi-registers>>.
 
 [[t-rvmodel]]
 .RVMODEL DUT-Specific Macros
@@ -295,7 +295,7 @@ The test must implement a custom _Test Supervisor Binary Interface_ (T-SBI) prov
 
 The ratified SBI compiles into a ~1MB OpenSBI firmware binary, which is unnecessarily large to load with every test.  Moreover, the SBI calling convention uses `a7` and `a6`, which are not available on RV32E.  Therefore,  T-SBI is a lighter-weight implementation with a custom calling convention that is incompatible with the ratified SBI.
 
-The SBI is invoked with the `ecall` instruction.  The operation is passed in `a0`.  An additional argument could be passed in `a1` (and possibly `a2`) and a result could be returned in `a0` if needed. Other values of `a0` are reserved.
+The T-SBI is invoked with the `ecall` instruction.  The operation is passed in `a0`.  Arguments, if any, are passed in `a1` and `a2`.  A result, if any, is returned in `a0`; otherwise `a0` is unspecified after the call.  A T-SBI call preserves all other registers, including `a1` and `a2`.  Values of `a0` not listed below are reserved.
 
 [[t-tsbi]]
 .T-SBI Calls
@@ -363,6 +363,25 @@ The following macros are defined for developer convenience to access the T-SBI a
 * RVTEST_TSBI_SW: performs `sw a2, 0(a1)` with machine-mode privileges.  Used to write memory-mapped I/O such as `mtimecmp` or `msip`.
 * RVTEST_TSBI_SWP4: performs `sw a2, 4(a1)` with machine-mode privileges.  Used to write memory-mapped I/O such as `mtimecmph`.
 * RVTEST_TSBI_SD: performs `sd a2, 0(a1)` with machine-mode privileges.  Used to write memory-mapped I/O such as `mtimecmp` or `msip`. RV64 only.
+
+[[tsbi-registers]]
+==== Register Usage
+
+<<t-tsbi-registers>> lists the registers that each layer of the T-SBI and the code built on it may clobber.  Each layer preserves all other registers.
+
+[[t-tsbi-registers]]
+.Registers Clobbered by T-SBI Calls and Related Macros
+[options=header]
+[cols="2, 3", options=header]
+|===
+|Layer|May clobber
+|T-SBI call (`ecall` with the operation in `a0`), including the ACT system calls|`a0`
+|`RVTEST_TSBI_*` macros|`a0`, and `a1` for `RVTEST_TSBI_CSR_SET`, `RVTEST_TSBI_CSR_CLEAR`, and `RVTEST_TSBI_CSR_WRITE`, which load `imm` into `a1`
+|`+RVTEST_SET_*_INT*+` and `+RVTEST_CLR_*_INT*+` interrupt macros|`ra`, `a0`, `a1`, `a2`
+|RVMODEL DUT-specific macros|`a0`, `a1`, `a2`, and the macro's register arguments, unless its description in <<t-rvmodel>> says otherwise
+|===
+
+A T-SEE that replaces the reference trap handler must meet the T-SBI call row: the framework keeps values in `a1` and `a2` across T-SBI calls.  RVMODEL macros must preserve `ra` because the framework calls them from routines that return with `ret`, and must preserve the other registers because some of those routines run inside the trap handler.
 
 TODO
 

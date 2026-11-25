@@ -67,8 +67,10 @@ def _generate_priv_test_entry(
     # Reserve registers for priv tests:
     #   - x0: avoid so desired values are actually loaded into registers
     #   - x1/ra: used as the return address for function calls
-    #   - x7 is clobbered in rtn_fm_mmode in rvtest_trap_handler.h  Might be freed up if this is redesigned.
-    #   - x10, x11, x12 (a0/a1/a2): Used by T-SBI.
+    #   - x7: the trap handler preserves it, but it stays reserved so that register allocation in the
+    #     generated tests does not change. Freeing it regenerates every privileged test.
+    #   - x10, x11, x12 (a0/a1/a2): T-SBI arguments and result, and clobbered by the
+    #     RVTEST_SET/CLR_*_INT* framework routines.
     #   - x16-x31: ensure the same test can be used for I or E bases
     priv_exclude_regs = [0, 1, 7, 10, 11, 12, *range(16, 32)]
     test_data.int_regs.consume_registers(priv_exclude_regs)

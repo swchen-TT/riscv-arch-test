@@ -13,7 +13,7 @@
 //  trap handling infrastructure. It is #included by test programs and provides:
 //
 //    1. REGISTER ALIASES        — T1..T4 mapped to x6..x9, T5/T6 to x14/x15;
-//                                  DEFAULT_SIG/DATA/TEMP/LINK. a0/a1 (x10/x11) are
+//                                  DEFAULT_SIG/DATA/TEMP/LINK. a0-a2 (x10-x12) are
 //                                  deliberately NOT used as handler temporaries: they
 //                                  are the T-SBI argument/return registers.
 //    2. ARCHITECTURE CONSTANTS  — interrupt/exception cause counts, masks, mode encodings
@@ -89,12 +89,12 @@
 //  Calling convention:
 //    - Invoke with `ecall`
 //    - a0 = operation code (see TSBI_* constants below)
-//    - a1 = optional argument (e.g., CSR rs1 value)
+//    - a1, a2 = optional arguments (e.g., CSR rs1 value, store address and data)
 //    - Result returned in a0
-//    - a0/a1 are the ONLY registers the handler may leave modified (a0 as the
-//      return value). The handler never uses a0/a1 as internal temporaries;
-//      its temporaries are T1..T6 (x6..x9, x14, x15), which are always
-//      saved/restored through the save area.
+//    - a0 is the ONLY register the handler may leave modified. The handler
+//      never uses a0-a2 as internal temporaries; its temporaries are T1..T6
+//      (x6..x9, x14, x15), which are always saved/restored through the save
+//      area. See "Register Usage" in the CTP abstraction layer chapter.
 //
 //  Operations:
 //    TSBI_GOTO_MMODE  (a0=1)          — Switch caller to M-mode
@@ -651,7 +651,8 @@
 //   RVTEST_TSBI_ECALL_TEST              // ecall recorded in the trap signature, xEPC in a0
 //   RVTEST_TSBI_CSR_ACCESS 0x30002573   // read mstatus into a0
 //
-// CLOBBERS: a0 (operation code / return value), a1 (CSR_ACCESS argument only)
+// CLOBBERS: a0 (operation code / return value), and a1 in RVTEST_TSBI_CSR_SET/CLEAR/WRITE,
+//           which load their imm argument into a1
 // PRESERVES: all other registers
 // PRECONDITION: a0 must be non-zero (it always is during normal test execution)
 //==============================================================================
@@ -1773,7 +1774,7 @@ tsbi_\__MODE__\()forward:
         LREG    T5, trap_sv_off+5*REGWIDTH(sp)    // restore T5 (x14)
         LREG    T6, trap_sv_off+6*REGWIDTH(sp)    // restore T6 (x15)
         LREG    sp, trap_sv_off+7*REGWIDTH(sp)    // restore original sp (undo the xSCRATCH swap)
-        ecall                                      // trap to M-mode (HS-mode from VS) with a0/a1 intact
+        ecall                                      // trap to M-mode (HS-mode from VS) with a0-a2 intact
         // For CSR_ACCESS: the handler executes the CSR op and returns back here with the
         //   result in a0; sret returns to the caller (sepc was bumped past its ecall already).
         sret                                       // sret back to the caller
